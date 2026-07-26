@@ -12,6 +12,7 @@ import pickle
 import base64
 import hashlib
 import subprocess
+import json
 
 app = Flask(__name__)
 
@@ -208,9 +209,13 @@ def view_file():
     filename = request.args.get('name', '')
 
     if filename:
-        # VULNERABLE: No path validation
+        # FIXED: Validate and sanitize the file path
+        base_path = os.path.abspath("safe_directory")
+        requested_path = os.path.abspath(os.path.join(base_path, filename))
+        if not requested_path.startswith(base_path):
+            return '<p>Error: Invalid file path.</p><p><a href="/">Back</a></p>'
         try:
-            with open(filename, 'r') as f:
+            with open(requested_path, 'r') as f:
                 content = f.read()
             return f'''
             <html>
@@ -249,9 +254,9 @@ def deserialize():
 
     if data:
         try:
-            # VULNERABLE: Unpickling untrusted data
+            # FIXED: Use JSON instead of pickle for safe deserialization
             decoded = base64.b64decode(data)
-            obj = pickle.loads(decoded)
+            obj = json.loads(decoded)
             return f'''
             <html>
             <body>
@@ -262,14 +267,14 @@ def deserialize():
             </html>
             '''
         except Exception as e:
-            return f'<p>Error: {str(e)}</p><p><a href="/">Back</a></p>'
+            return f'<p>Error: An error occurred while processing your request. Please try again later.</p><p><a href="/">Back</a></p>'
     else:
         return '''
         <html>
         <body>
             <h1>Deserialize Data</h1>
             <form action="/deserialize" method="get">
-                <input type="text" name="data" placeholder="Enter base64 encoded pickle data">
+                <input type="text" name="data" placeholder="Enter base64 encoded JSON data">
                 <input type="submit" value="Deserialize">
             </form>
             <p><a href="/">Back</a></p>
